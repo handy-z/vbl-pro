@@ -1,0 +1,8 @@
+{
+  "name": "vbl-pro",
+  "version": "0.1.0",
+  "private": true,
+  "napi": {
+    "binaryName": "vbl-pro"
+  }
+}

@@ -1,0 +1,40 @@
+{
+  "resolutions": [
+    {
+      "width": 1920,
+      "height": 1080,
+      "configs": [
+        {
+          "key": "GameOnGround",
+          "point": [942, 1003],
+          "target": [255, 225, 148],
+          "tolerance": 0
+        },
+        {
+          "key": "GameSkillReady",
+          "point": [1030, 903],
+          "target": [255, 255, 255],
+          "tolerance": 0
+        }
+      ]
+    },
+    {
+      "width": 1600,
+      "height": 900,
+      "configs": [
+        {
+          "key": "GameOnGround",
+          "point": [787, 835],
+          "target": [255, 225, 148],
+          "tolerance": 0
+        },
+        {
+          "key": "GameSkillReady",
+          "point": [862, 752],
+          "target": [255, 255, 255],
+          "tolerance": 0
+        }
+      ]
+    }
+  ]
+}

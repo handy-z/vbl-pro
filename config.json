@@ -1,0 +1,12 @@
+{
+    "skill": "normal",
+    "crosshair": {
+        "enabled": true,
+        "color": "#FFFFFF",
+        "offset": {
+            "x": 0,
+            "y": -200
+        },
+        "scale": 1
+    }
+}
