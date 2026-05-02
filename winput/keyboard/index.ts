@@ -1,7 +1,7 @@
 import * as action from "./action";
 import * as listener from "./listener";
 import type { Key, KeyboardEvent } from "../types";
-import type { Delay } from "keysender";
+import type { Delay } from "./action";
 
 type AllKeyCallback = (event: KeyboardEvent) => void;
 type FilteredKeyCallback = (event: KeyboardEvent) => void;

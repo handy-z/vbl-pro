@@ -1,6 +1,7 @@
-import { isButtonPressed, sleep } from "keysender";
-import { hw } from "../keyboard/action";
+import { sleep } from "../utils";
 import type { MouseBtn, Position } from "../types";
+
+const nativeInput = require("../../native/input/input.node");
 
 export class MouseChain implements PromiseLike<void> {
   private promise: Promise<void>;
@@ -19,27 +20,27 @@ export class MouseChain implements PromiseLike<void> {
   down(button?: MouseBtn): MouseChain {
     const b = button ?? this.lastButton;
     this.lastButton = b;
-    this.promise = this.promise.then(() => hw.mouse.toggle(b, true));
+    this.promise = this.promise.then(() => nativeInput.mouseDown(b));
     return this;
   }
 
   up(button?: MouseBtn): MouseChain {
     const b = button ?? this.lastButton;
-    this.promise = this.promise.then(() => hw.mouse.toggle(b, false));
+    this.promise = this.promise.then(() => nativeInput.mouseUp(b));
     return this;
   }
 
   click(button?: MouseBtn, delay?: number): MouseChain {
     const b = button ?? this.lastButton;
-    this.promise = this.promise.then(() => hw.mouse.click(b, delay));
+    this.promise = this.promise.then(() => nativeInput.mouseClick(b, delay));
     return this;
   }
 
   doubleClick(button?: MouseBtn, delay?: number): MouseChain {
     const b = button ?? this.lastButton;
     this.promise = this.promise.then(async () => {
-      await hw.mouse.click(b, delay);
-      await hw.mouse.click(b, delay);
+      nativeInput.mouseClick(b, delay);
+      nativeInput.mouseClick(b, delay);
     });
     return this;
   }
@@ -47,18 +48,21 @@ export class MouseChain implements PromiseLike<void> {
   move(x: number, y: number, duration?: number, smooth?: boolean): MouseChain {
     this.promise = this.promise.then(async () => {
       if (smooth && duration) {
-        await hw.mouse.humanMoveTo(x, y, Math.max(1, Math.round(20 / (duration / 100))));
+        await smoothMoveTo(x, y, duration);
       } else if (duration) {
-        await hw.mouse.moveTo(x, y, duration);
+        await smoothMoveTo(x, y, duration);
       } else {
-        await hw.mouse.moveTo(x, y);
+        nativeInput.mouseMoveTo(x, y);
       }
     });
     return this;
   }
 
   moveBy(dx: number, dy: number, delay?: number): MouseChain {
-    this.promise = this.promise.then(() => hw.mouse.move(dx, dy, delay));
+    this.promise = this.promise.then(async () => {
+      nativeInput.mouseMoveBy(dx, dy);
+      if (delay) await sleep(delay);
+    });
     return this;
   }
 
@@ -68,23 +72,27 @@ export class MouseChain implements PromiseLike<void> {
   }
 
   wheel(amount: number, delay?: number): MouseChain {
-    this.promise = this.promise.then(() => hw.mouse.scrollWheel(amount, delay));
+    this.promise = this.promise.then(async () => {
+      nativeInput.mouseWheel(amount);
+      if (delay) await sleep(delay);
+    });
     return this;
   }
 
   drag(fromX: number, fromY: number, toX: number, toY: number, button?: MouseBtn): MouseChain {
     const b = button ?? this.lastButton;
     this.promise = this.promise.then(async () => {
-      await hw.mouse.moveTo(fromX, fromY);
-      await hw.mouse.toggle(b, true, 35);
-      await hw.mouse.humanMoveTo(toX, toY);
-      await hw.mouse.toggle(b, false);
+      nativeInput.mouseMoveTo(fromX, fromY);
+      nativeInput.mouseDown(b);
+      await sleep(35);
+      await smoothMoveTo(toX, toY, 200);
+      nativeInput.mouseUp(b);
     });
     return this;
   }
 
   setPosition(pos: Position): MouseChain {
-    this.promise = this.promise.then(() => hw.mouse.moveTo(pos.x, pos.y));
+    this.promise = this.promise.then(() => nativeInput.mouseMoveTo(pos.x, pos.y));
     return this;
   }
 
@@ -97,7 +105,7 @@ export class MouseChain implements PromiseLike<void> {
 }
 
 export function click(button: MouseBtn = "left", delay?: number): MouseChain {
-  return new MouseChain(hw.mouse.click(button, delay), button);
+  return new MouseChain(Promise.resolve(nativeInput.mouseClick(button, delay)), button);
 }
 
 export function doubleClick(button: MouseBtn = "left", delay?: number): MouseChain {
@@ -111,11 +119,11 @@ export function tripleClick(button: MouseBtn = "left", delay?: number): MouseCha
 }
 
 export function down(button: MouseBtn = "left"): MouseChain {
-  return new MouseChain(hw.mouse.toggle(button, true), button);
+  return new MouseChain(Promise.resolve(nativeInput.mouseDown(button)), button);
 }
 
 export function up(button: MouseBtn = "left"): MouseChain {
-  return new MouseChain(hw.mouse.toggle(button, false), button);
+  return new MouseChain(Promise.resolve(nativeInput.mouseUp(button)), button);
 }
 
 export function move(x: number, y: number, duration?: number, smooth?: boolean): MouseChain {
@@ -123,7 +131,7 @@ export function move(x: number, y: number, duration?: number, smooth?: boolean):
 }
 
 export function moveBy(dx: number, dy: number, delay?: number): MouseChain {
-  return new MouseChain(hw.mouse.move(dx, dy, delay));
+  return new MouseChain(Promise.resolve()).moveBy(dx, dy, delay);
 }
 
 export function hold(button: MouseBtn = "left", durationMs: number = 500): MouseChain {
@@ -137,17 +145,31 @@ export function drag(
 }
 
 export function wheel(amount: number, delay?: number): MouseChain {
-  return new MouseChain(hw.mouse.scrollWheel(amount, delay));
+  return new MouseChain(Promise.resolve()).wheel(amount, delay);
 }
 
 export function getPosition(): Position {
-  return hw.mouse.getPos();
+  const [x, y] = nativeInput.mousePosition() as [number, number];
+  return { x, y };
 }
 
 export function setPosition(pos: Position): MouseChain {
-  return new MouseChain(hw.mouse.moveTo(pos.x, pos.y));
+  return new MouseChain(Promise.resolve(nativeInput.mouseMoveTo(pos.x, pos.y)));
 }
 
 export function getState(button: MouseBtn): boolean {
-  return isButtonPressed("mouse", button);
+  return nativeInput.isMouseDown(button);
+}
+
+async function smoothMoveTo(x: number, y: number, duration: number) {
+  const start = getPosition();
+  const steps = Math.max(1, Math.round(duration / 10));
+  for (let i = 1; i <= steps; i++) {
+    const t = i / steps;
+    nativeInput.mouseMoveTo(
+      Math.round(start.x + (x - start.x) * t),
+      Math.round(start.y + (y - start.y) * t),
+    );
+    await sleep(Math.max(1, Math.round(duration / steps)));
+  }
 }

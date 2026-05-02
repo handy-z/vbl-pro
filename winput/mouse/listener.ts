@@ -1,14 +1,6 @@
-import { uIOhook } from "uiohook-napi";
-import type { MouseBtn, MouseEvent, MouseMoveEvent, MouseWheelEvent } from "../types";
-import { enrichMouseEvent, enrichWheelEvent } from "../types";
-
-let started = false;
-function ensureStarted() {
-  if (!started) {
-    started = true;
-    uIOhook.start();
-  }
-}
+import { ensureStarted } from "../hook";
+import type { MouseBtn, MouseEvent, MouseMoveEvent, MouseWheelEvent, NativeInputEvent } from "../types";
+import { enrichMouseEvent, enrichWheelEvent } from "../utils";
 
 type AllBtnCallback = (event: MouseEvent) => void;
 type FilteredBtnCallback = (event: MouseEvent) => void;
@@ -35,29 +27,25 @@ let hooked = false;
 function ensureHooked() {
   if (hooked) return;
   hooked = true;
+}
 
-  uIOhook.on("mousedown", (e) => {
+export function handleNativeMouseEvent(e: NativeInputEvent) {
+  if (e.type === "mousedown") {
     const event = enrichMouseEvent(e);
     emit(downAll, event);
     const cbs = downFiltered.get(event.btn);
     if (cbs) emit(cbs, event);
-  });
-
-  uIOhook.on("mouseup", (e) => {
+  } else if (e.type === "mouseup") {
     const event = enrichMouseEvent(e);
     emit(upAll, event);
     const cbs = upFiltered.get(event.btn);
     if (cbs) emit(cbs, event);
-  });
-
-  uIOhook.on("mousemove", (e) => {
-    emit(moveListeners, e);
-  });
-
-  uIOhook.on("wheel", (e) => {
+  } else if (e.type === "mousemove") {
+    emit(moveListeners, { ...e, x: e.x ?? 0, y: e.y ?? 0 });
+  } else if (e.type === "wheel") {
     const event = enrichWheelEvent(e);
     emit(wheelListeners, event);
-  });
+  }
 }
 
 export function on(event: "down", callback: AllBtnCallback): () => void;

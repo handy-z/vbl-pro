@@ -1,14 +1,6 @@
-import { uIOhook } from "uiohook-napi";
-import type { Key, KeyboardEvent } from "../types";
-import { UIOHOOK_TO_KEY, enrichKeyboardEvent } from "../types";
-
-let started = false;
-function ensureStarted() {
-  if (!started) {
-    started = true;
-    uIOhook.start();
-  }
-}
+import type { Key, KeyboardEvent, NativeInputEvent } from "../types";
+import { UIOHOOK_TO_KEY, enrichKeyboardEvent } from "../utils";
+import { ensureStarted } from "../hook";
 
 type AllKeyCallback = (event: KeyboardEvent) => void;
 type FilteredKeyCallback = (event: KeyboardEvent) => void;
@@ -33,28 +25,29 @@ let hooked = false;
 function ensureHooked() {
   if (hooked) return;
   hooked = true;
+}
 
-  uIOhook.on("keydown", (e) => {
+export function handleNativeKeyboardEvent(e: NativeInputEvent) {
+  if (e.type === "keydown") {
     const event = enrichKeyboardEvent(e, heldKeys);
-    heldKeys.add(e.keycode);
+    heldKeys.add(event.keycode);
     emit(downAll, event);
-    const key = UIOHOOK_TO_KEY[e.keycode];
+    const key = UIOHOOK_TO_KEY[event.keycode];
     if (key) {
       const cbs = downFiltered.get(key);
       if (cbs) emit(cbs, event);
     }
-  });
-
-  uIOhook.on("keyup", (e) => {
-    heldKeys.delete(e.keycode);
+  } else if (e.type === "keyup") {
+    const keycode = e.keycode ?? 0;
+    heldKeys.delete(keycode);
     const event = enrichKeyboardEvent(e, heldKeys);
     emit(upAll, event);
-    const key = UIOHOOK_TO_KEY[e.keycode];
+    const key = UIOHOOK_TO_KEY[event.keycode];
     if (key) {
       const cbs = upFiltered.get(key);
       if (cbs) emit(cbs, event);
     }
-  });
+  }
 }
 
 export function on(event: "down", callback: AllKeyCallback): () => void;

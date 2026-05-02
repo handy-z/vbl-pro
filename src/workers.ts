@@ -1,80 +1,78 @@
 import { gameState, watcherConfig } from "./state";
-import { keyboard } from "../winput";
 import config from "../config.json";
 
-function createWorker(name: string) {
-  return import.meta.url.endsWith(".js")
-    ? new Worker(new URL(`./workers/${name}.js`, import.meta.url))
-    : import.meta.url.endsWith(".ts")
-      ? new Worker(new URL(`./workers/${name}.ts`, import.meta.url))
-      : new Worker(`./workers/${name}.ts`);
-}
+const { startScanner, stopScanner } = require("../native/pixel/pixel.node");
+const { startFocusMonitor: startNativeFocus, stopFocusMonitor: stopNativeFocus } = require("../native/focus/focus.node");
+const { startX2Loop, stopX2Loop } = require("../native/input/input.node");
 
-function bindWorkerErrors(worker: Worker, name: string) {
-  worker.onerror = (event) => {
-    console.error(`${name} worker error`, event.message);
-  };
-  worker.onmessageerror = () => {
-    console.error(`${name} worker message error`);
-  };
-}
-
-export function initPixelWorker() {
-  const pixelWorker = createWorker("pixel");
-  bindWorkerErrors(pixelWorker, "pixel");
-  pixelWorker.postMessage({
-    ...gameState.transferable(),
-    resolutions: watcherConfig.resolutions.map((res) => ({
-      width: res.width,
-      height: res.height,
-      configs: res.configs.map((cfg) => ({
-        key: cfg.key,
-        point: cfg.point,
-        target: cfg.target,
-        tolerance: cfg.tolerance,
-      })),
+export function startPixelScanner() {
+  const mappedResolutions = watcherConfig.resolutions.map((res) => ({
+    width: res.width,
+    height: res.height,
+    configs: res.configs.map((cfg) => ({
+      slot: gameState.slots[cfg.key as keyof typeof gameState.slots],
+      point: cfg.point,
+      target: cfg.target,
+      tolerance: cfg.tolerance,
     })),
-  });
+  }));
 
-  pixelWorker.onmessage = (e: MessageEvent) => {
-    if (e.data.type === "resolution") {
-      console.log(`Resolution: ${e.data.width}x${e.data.height}`);
-    } else if (e.data.type === "resolution_missing") {
-      console.warn(`No config for resolution ${e.data.width}x${e.data.height}`);
-    }
-  };
-
-  return pixelWorker;
-}
-
-export function initLoopx2Worker() {
-  const loopx2Worker = createWorker("x2");
-  bindWorkerErrors(loopx2Worker, "x2");
-  loopx2Worker.postMessage({
-    type: "init",
-    ...gameState.transferable(),
-  });
-
-  loopx2Worker.onmessage = async (e: MessageEvent) => {
-    if (e.data.action === "combo") {
-      if (gameState.is("skillEnabled") && gameState.is("GameSkillReady") && config.skill === "boomjump") {
-        await keyboard.tap("shift").tap("ctrl").wait(25).tap("shift");
-      } else {
-        await keyboard.tap("shift").tap("space").tap("shift");
+  startScanner(
+    gameState.view,
+    JSON.stringify(mappedResolutions),
+    (err: any, jsonStr: string) => {
+      if (err) {
+        console.error("Pixel scanner error", err);
+        return;
       }
-      loopx2Worker.postMessage({ type: "done" });
+      try {
+        const e = JSON.parse(jsonStr);
+        if (e.type === "resolution") {
+          console.log(`Resolution: ${e.width}x${e.height}`);
+        } else if (e.type === "resolution_missing") {
+          console.warn(`No config for resolution ${e.width}x${e.height}`);
+        }
+      } catch (parseErr) {
+        console.error("Failed to parse pixel scanner event", parseErr);
+      }
     }
-  };
-
-  return loopx2Worker;
+  );
 }
 
-export function initFocusWorker() {
-  const focusWorker = createWorker("focus");
-  bindWorkerErrors(focusWorker, "focus");
-  focusWorker.postMessage({
-    type: "init",
-    ...gameState.transferable(),
-  });
-  return focusWorker;
+export function stopPixelScanner() {
+  stopScanner();
+}
+
+export function startLoopx2() {
+  startX2Loop(
+    gameState.view,
+    gameState.slots.X2Held,
+    gameState.slots.GameOnGround,
+    gameState.slots.skillEnabled,
+    gameState.slots.GameSkillReady,
+    config.skill === "boomjump",
+  );
+}
+
+export function stopLoopx2() {
+  stopX2Loop();
+}
+
+export function startFocusMonitor(onFocusChange: (active: boolean) => void) {
+  startNativeFocus(
+    gameState.view,
+    gameState.slots.robloxFocused,
+    "RobloxPlayerBeta.exe",
+    (err: any, active: boolean) => {
+      if (err) {
+        console.error("Focus monitor error", err);
+        return;
+      }
+      onFocusChange(active);
+    }
+  );
+}
+
+export function stopFocusMonitor() {
+  stopNativeFocus();
 }

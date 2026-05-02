@@ -1,19 +1,19 @@
 export { keyboard } from "./keyboard";
 export { mouse } from "./mouse";
-export { sleep } from "keysender";
+export { sleep } from "./utils";
 export type { Key, RegularKey, SpecKey, MouseBtn, Position, KeyboardEvent, MouseEvent, MouseWheelEvent, MouseMoveEvent } from "./types";
-export { UiohookKey, EventType, WheelDirection } from "uiohook-napi";
+export { UiohookKey, EventType, WheelDirection } from "./utils";
 
 import { keyboard } from "./keyboard";
 import { mouse } from "./mouse";
-import { uIOhook } from "uiohook-napi";
+import { startHook, stopHook } from "./hook";
 
 export function start() {
-  uIOhook.start();
+  startHook();
 }
 
 export function stop() {
-  uIOhook.stop();
+  stopHook();
 }
 
 const winput = { keyboard, mouse, start, stop } as const;

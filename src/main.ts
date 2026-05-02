@@ -1,5 +1,5 @@
 import { closeSync, openSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
-import { initPixelWorker, initLoopx2Worker, initFocusWorker } from "./workers";
+import { startPixelScanner, stopPixelScanner, startLoopx2, stopLoopx2, startFocusMonitor } from "./workers";
 import { startCrosshairOverlay, stopCrosshairOverlay } from "./overlay";
 import { bindMouseEvents } from "./input";
 import { join } from "node:path";
@@ -109,37 +109,33 @@ export async function main() {
   const start = Bun.nanoseconds();
   await startCrosshairOverlay();
 
-  let pixelWorker: Worker | null = null;
-  let loopx2Worker: Worker | null = null;
+  let workersRunning = false;
 
   function startWorkers() {
-    if (pixelWorker && loopx2Worker) return;
+    if (workersRunning) return;
     stopWorkers();
-    pixelWorker = initPixelWorker();
-    loopx2Worker = initLoopx2Worker();
+    workersRunning = true;
+    startPixelScanner();
+    startLoopx2();
   }
 
   function stopWorkers() {
-    pixelWorker?.terminate();
-    pixelWorker = null;
-    loopx2Worker?.terminate();
-    loopx2Worker = null;
+    workersRunning = false;
+    stopPixelScanner();
+    stopLoopx2();
   }
 
-  const focusWorker = initFocusWorker();
-  focusWorker.onmessage = (e: MessageEvent) => {
-    if (e.data.type === "focus") {
-      if (e.data.active) {
-        startWorkers();
-        winput.start();
-        console.log("Roblox Focused");
-      } else {
-        stopWorkers();
-        winput.stop();
-        console.log("Roblox Unfocused");
-      }
+  startFocusMonitor((active) => {
+    if (active) {
+      startWorkers();
+      winput.start();
+      console.log("Roblox Focused");
+    } else {
+      stopWorkers();
+      winput.stop();
+      console.log("Roblox Unfocused");
     }
-  };
+  });
 
   bindMouseEvents();
   console.log("started in", (Bun.nanoseconds() - start) / 1000000, "ms");

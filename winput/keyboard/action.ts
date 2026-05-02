@@ -1,11 +1,9 @@
-import { Hardware, isButtonPressed, sleep } from "keysender";
-import type { Delay } from "keysender";
 import type { Key } from "../types";
-import { getToggleState } from "../types";
+import { sleep } from "../utils";
 
-const hw = new Hardware();
+const nativeInput = require("../../native/input/input.node");
 
-export { hw };
+export type Delay = number;
 
 export class InputChain implements PromiseLike<void> {
   private promise: Promise<void>;
@@ -20,33 +18,42 @@ export class InputChain implements PromiseLike<void> {
   }
 
   down(key: Key): InputChain {
-    this.promise = this.promise.then(() => hw.keyboard.toggleKey(key, true));
+    this.promise = this.promise.then(() => nativeInput.keyDown(key));
     return this;
   }
 
   up(key: Key): InputChain {
-    this.promise = this.promise.then(() => hw.keyboard.toggleKey(key, false));
+    this.promise = this.promise.then(() => nativeInput.keyUp(key));
     return this;
   }
 
   tap(key: Key, delay?: number): InputChain {
-    this.promise = this.promise.then(() => hw.keyboard.sendKey(key, delay));
+    this.promise = this.promise.then(() => nativeInput.keyTap(key, delay));
     return this;
   }
 
   toggle(key: Key | Key[], state: boolean, delay?: Delay): InputChain {
-    this.promise = this.promise.then(() => hw.keyboard.toggleKey(key, state, delay));
+    this.promise = this.promise.then(async () => {
+      const keys = Array.isArray(key) ? key : [key];
+      for (const item of keys) {
+        state ? nativeInput.keyDown(item) : nativeInput.keyUp(item);
+        if (delay) await sleep(delay);
+      }
+    });
     return this;
   }
 
   write(text: string, charDelayMs?: number, humanize?: boolean): InputChain {
     this.promise = this.promise.then(async () => {
       if (humanize && charDelayMs) {
-        const min = Math.floor(charDelayMs * 0.5);
-        const max = Math.floor(charDelayMs * 1.5);
-        await hw.keyboard.printText(text, [min, max]);
+        for (const ch of text) {
+          nativeInput.writeText(ch);
+          const min = Math.floor(charDelayMs * 0.5);
+          const max = Math.floor(charDelayMs * 1.5);
+          await sleep(min + Math.floor(Math.random() * (max - min + 1)));
+        }
       } else {
-        await hw.keyboard.printText(text, charDelayMs);
+        nativeInput.writeText(text, charDelayMs);
       }
     });
     return this;
@@ -57,9 +64,9 @@ export class InputChain implements PromiseLike<void> {
       if (combo.length === 0) return;
       const mainKey = combo.at(-1)!;
       const modifiers = combo.slice(0, -1);
-      for (const mod of modifiers) await hw.keyboard.toggleKey(mod, true);
-      await hw.keyboard.sendKey(mainKey);
-      for (const mod of modifiers.toReversed()) await hw.keyboard.toggleKey(mod, false);
+      for (const mod of modifiers) nativeInput.keyDown(mod);
+      nativeInput.keyTap(mainKey);
+      for (const mod of modifiers.toReversed()) nativeInput.keyUp(mod);
     });
     return this;
   }
@@ -72,7 +79,7 @@ export class InputChain implements PromiseLike<void> {
     this.promise = this.promise.then(async () => {
       const lastIndex = keys.length - 1;
       for (const [index, key] of keys.entries()) {
-        await hw.keyboard.sendKey(key);
+        nativeInput.keyTap(key);
         if (index < lastIndex) await sleep(delay);
       }
     });
@@ -88,15 +95,15 @@ export class InputChain implements PromiseLike<void> {
 }
 
 export function tap(key: Key, delay?: number): InputChain {
-  return new InputChain(hw.keyboard.sendKey(key, delay));
+  return new InputChain(Promise.resolve(nativeInput.keyTap(key, delay)));
 }
 
 export function down(key: Key): InputChain {
-  return new InputChain(hw.keyboard.toggleKey(key, true));
+  return new InputChain(Promise.resolve(nativeInput.keyDown(key)));
 }
 
 export function up(key: Key): InputChain {
-  return new InputChain(hw.keyboard.toggleKey(key, false));
+  return new InputChain(Promise.resolve(nativeInput.keyUp(key)));
 }
 
 export function write(text: string, charDelayMs?: number, humanize?: boolean): InputChain {
@@ -104,7 +111,7 @@ export function write(text: string, charDelayMs?: number, humanize?: boolean): I
 }
 
 export function toggle(key: Key | Key[], state: boolean, delay?: Delay): InputChain {
-  return new InputChain(hw.keyboard.toggleKey(key, state, delay));
+  return new InputChain(Promise.resolve()).toggle(key, state, delay);
 }
 
 export function shortcut(...combo: Key[]): InputChain {
@@ -120,9 +127,9 @@ export function sequence(keys: Key[], delay: number = 35): InputChain {
 }
 
 export function isDown(key: Key): boolean {
-  return isButtonPressed("keyboard", key);
+  return nativeInput.isKeyDown(key);
 }
 
 export function getState(key: string): boolean {
-  return getToggleState(key);
+  return nativeInput.getToggleState(key);
 }
