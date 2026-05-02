@@ -17,6 +17,7 @@ report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 .env.local
 .eslintcache
 .cache
+.claude
 *.tsbuildinfo
 .idea
 .DS_Store

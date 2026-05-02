@@ -7,7 +7,7 @@
     "start": "bun run src/main.ts",
     "dev": "bun run --watch src/main.ts",
     "check": "bunx tsc --noEmit",
-    "build": "bun run build:overlay && bun run clean:build && bun build src/main.ts src/workers/pixel.ts src/workers/x2.ts src/workers/focus.ts --target=bun --minify --outdir ./build",
+    "build": "bun run build:overlay && bun run clean:build && bun build src/main.ts src/workers/pixel.ts src/workers/x2.ts src/workers/focus.ts --target=bun --bytecode --minify --sourcemap --outdir ./build",
     "compile": "bun run build:overlay && bun run clean:release && bun build src/main.ts src/workers/pixel.ts src/workers/x2.ts src/workers/focus.ts --compile --target=bun --bytecode --minify --sourcemap --outfile ./release/vbl-pro.exe",
     "build:overlay": "napi build --manifest-path native/overlay/Cargo.toml --package-json-path native/overlay/package.json --release --output-dir native/overlay --no-dts-header",
     "clean:build": "bun -e \"require('node:fs').rmSync('./build',{recursive:true,force:true})\"",
