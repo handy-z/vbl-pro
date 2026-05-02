@@ -7,7 +7,7 @@ type OverlayNative = {
   isOverlayRunning(): boolean;
 };
 
-const native = require("native/overlay/vbl-pro.node") as OverlayNative;
+const native = require("native/overlay/overlay.node") as OverlayNative;
 const targetProcessName = "RobloxPlayerBeta.exe";
 
 export async function startCrosshairOverlay() {

@@ -1,8 +1,8 @@
 {
-  "name": "vbl-pro",
+  "name": "overlay",
   "version": "0.1.0",
   "private": true,
   "napi": {
-    "binaryName": "vbl-pro"
+    "binaryName": "overlay"
   }
 }

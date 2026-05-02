@@ -153,6 +153,6 @@ async function loop(state: GameState, resolutions: PreparedResolutionMap) {
       }
     }
 
-    await Bun.sleep(1);
+    await Bun.sleep(16);
   }
 }

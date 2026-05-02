@@ -5,7 +5,7 @@ use std::ffi::c_void;
 use std::iter::once;
 use std::mem::{size_of, zeroed};
 use std::ptr::{null, null_mut};
-use std::sync::atomic::{AtomicU32, Ordering};
+use std::sync::atomic::{AtomicU32, Ordering, AtomicUsize};
 use std::sync::Mutex;
 use std::thread::{self, JoinHandle};
 use windows_sys::Win32::Foundation::{
@@ -31,6 +31,7 @@ use windows_sys::Win32::UI::WindowsAndMessaging::{
     CreateWindowExW, DefWindowProcW, DestroyWindow, DispatchMessageW, GetAncestor, GetClientRect,
     GetForegroundWindow, GetWindowLongPtrW, GetWindowThreadProcessId, IsIconic, IsWindowVisible,
     KillTimer, MsgWaitForMultipleObjects, PeekMessageW, PostThreadMessageW, RegisterClassExW,
+    PostMessageW,
     SetTimer, SetWindowLongPtrW, SetWindowPos, ShowWindow, TranslateMessage, UpdateLayeredWindow,
     CS_HREDRAW, CS_VREDRAW, CW_USEDEFAULT, EVENT_OBJECT_LOCATIONCHANGE, EVENT_SYSTEM_FOREGROUND,
     GA_ROOT, GWLP_USERDATA, HWND_TOPMOST, MSG, PM_REMOVE, QS_ALLINPUT, SWP_NOACTIVATE, SWP_NOMOVE,
@@ -47,6 +48,7 @@ const WM_OVERLAY_REFRESH: u32 = WM_APP + 41;
 
 static OVERLAY: OnceCell<Mutex<Option<OverlayHandle>>> = OnceCell::new();
 static OVERLAY_THREAD_ID: AtomicU32 = AtomicU32::new(0);
+static OVERLAY_HWND: AtomicUsize = AtomicUsize::new(0);
 
 #[napi(object)]
 pub struct CrosshairOffset {
@@ -307,6 +309,7 @@ unsafe fn run_overlay_thread(
     });
     let state_ptr = Box::into_raw(state);
     SetWindowLongPtrW(hwnd, GWLP_USERDATA, state_ptr as isize);
+    OVERLAY_HWND.store(hwnd as usize, Ordering::SeqCst);
     SetTimer(hwnd, TIMER_REFRESH, 250, None);
     OVERLAY_THREAD_ID.store(GetCurrentThreadId(), Ordering::SeqCst);
 
@@ -338,6 +341,7 @@ unsafe fn run_overlay_thread(
     if location_hook != 0 as HWINEVENTHOOK {
         UnhookWinEvent(location_hook);
     }
+    OVERLAY_HWND.store(0, Ordering::SeqCst);
     OVERLAY_THREAD_ID.store(0, Ordering::SeqCst);
     KillTimer(hwnd, TIMER_REFRESH);
     ShowWindow(hwnd, SW_HIDE);
@@ -404,6 +408,13 @@ unsafe extern "system" fn win_event_proc(
     _: u32,
     _: u32,
 ) {
+    let hwnd_val = OVERLAY_HWND.load(Ordering::SeqCst);
+    if hwnd_val != 0 {
+        let overlay_hwnd = hwnd_val as HWND;
+        PostMessageW(overlay_hwnd, WM_OVERLAY_REFRESH, 0, 0);
+        return;
+    }
+
     let thread_id = OVERLAY_THREAD_ID.load(Ordering::SeqCst);
     if thread_id != 0 {
         PostThreadMessageW(thread_id, WM_OVERLAY_REFRESH, 0, 0);

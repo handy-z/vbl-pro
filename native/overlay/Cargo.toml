@@ -1,5 +1,5 @@
 [package]
-name = "vbl-pro"
+name = "overlay"
 version = "0.1.0"
 edition = "2021"
 
@@ -24,3 +24,10 @@ windows-sys = { version = "0.61.2", features = [
 
 [build-dependencies]
 napi-build = "2.3.1"
+
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1
+panic = "abort"
+debug = 0

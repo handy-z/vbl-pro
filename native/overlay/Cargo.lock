@@ -297,6 +297,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9f7c3e4beb33f85d45ae3e3a1792185706c8e16d043238c593331cc7cd313b50"
 
 [[package]]
+name = "overlay"
+version = "0.1.0"
+dependencies = [
+ "image",
+ "napi",
+ "napi-build",
+ "napi-derive",
+ "once_cell",
+ "windows-sys",
+]
+
+[[package]]
 name = "pin-project-lite"
 version = "0.2.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -385,18 +397,6 @@ name = "unicode-segmentation"
 version = "1.13.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9629274872b2bfaf8d66f5f15725007f635594914870f65218920345aa11aa8c"
-
-[[package]]
-name = "vbl-pro"
-version = "0.1.0"
-dependencies = [
- "image",
- "napi",
- "napi-build",
- "napi-derive",
- "once_cell",
- "windows-sys",
-]
 
 [[package]]
 name = "windows-link"
