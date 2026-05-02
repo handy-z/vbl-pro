@@ -1,50 +1,35 @@
 import type { Key } from "../types";
 import { sleep } from "../utils";
-
-const nativeInput = require("../../native/input/input.node");
+import { nativeInput } from "../native";
+import { Chain } from "../chain";
 
 export type Delay = number;
 
-export class InputChain implements PromiseLike<void> {
-  private promise: Promise<void>;
-
-  constructor(initial: Promise<void>) {
-    this.promise = initial;
-  }
-
-  wait(ms: number): InputChain {
-    this.promise = this.promise.then(() => sleep(ms));
-    return this;
-  }
-
+export class InputChain extends Chain<InputChain> {
   down(key: Key): InputChain {
-    this.promise = this.promise.then(() => nativeInput.keyDown(key));
-    return this;
+    return this.append(() => nativeInput.keyDown(key));
   }
 
   up(key: Key): InputChain {
-    this.promise = this.promise.then(() => nativeInput.keyUp(key));
-    return this;
+    return this.append(() => nativeInput.keyUp(key));
   }
 
   tap(key: Key, delay?: number): InputChain {
-    this.promise = this.promise.then(() => nativeInput.keyTap(key, delay));
-    return this;
+    return this.append(() => nativeInput.keyTap(key, delay));
   }
 
   toggle(key: Key | Key[], state: boolean, delay?: Delay): InputChain {
-    this.promise = this.promise.then(async () => {
+    return this.append(async () => {
       const keys = Array.isArray(key) ? key : [key];
       for (const item of keys) {
         state ? nativeInput.keyDown(item) : nativeInput.keyUp(item);
         if (delay) await sleep(delay);
       }
     });
-    return this;
   }
 
   write(text: string, charDelayMs?: number, humanize?: boolean): InputChain {
-    this.promise = this.promise.then(async () => {
+    return this.append(async () => {
       if (humanize && charDelayMs) {
         for (const ch of text) {
           nativeInput.writeText(ch);
@@ -56,11 +41,10 @@ export class InputChain implements PromiseLike<void> {
         nativeInput.writeText(text, charDelayMs);
       }
     });
-    return this;
   }
 
   shortcut(...combo: Key[]): InputChain {
-    this.promise = this.promise.then(async () => {
+    return this.append(async () => {
       if (combo.length === 0) return;
       const mainKey = combo.at(-1)!;
       const modifiers = combo.slice(0, -1);
@@ -68,7 +52,6 @@ export class InputChain implements PromiseLike<void> {
       nativeInput.keyTap(mainKey);
       for (const mod of modifiers.toReversed()) nativeInput.keyUp(mod);
     });
-    return this;
   }
 
   hold(key: Key, durationMs: number): InputChain {
@@ -76,21 +59,13 @@ export class InputChain implements PromiseLike<void> {
   }
 
   sequence(keys: Key[], delay: number = 35): InputChain {
-    this.promise = this.promise.then(async () => {
+    return this.append(async () => {
       const lastIndex = keys.length - 1;
       for (const [index, key] of keys.entries()) {
         nativeInput.keyTap(key);
         if (index < lastIndex) await sleep(delay);
       }
     });
-    return this;
-  }
-
-  then<T = void, R = never>(
-    onfulfilled?: ((value: void) => T | PromiseLike<T>) | null,
-    onrejected?: ((reason: unknown) => R | PromiseLike<R>) | null,
-  ): Promise<T | R> {
-    return this.promise.then(onfulfilled, onrejected);
   }
 }
 

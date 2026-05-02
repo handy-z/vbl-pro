@@ -57,10 +57,9 @@ async function buildApp() {
     "bun",
     "build",
     "src/main.ts",
-    "--target=bun",
+    "--target=bun-windows-x64-modern",
     "--bytecode",
     "--minify",
-    "--sourcemap",
     "--outdir",
     "./build",
   ]);
@@ -73,10 +72,9 @@ async function compileApp() {
     "build",
     "src/main.ts",
     "--compile",
-    "--target=bun",
+    "--target=bun-windows-x64-modern",
     "--bytecode",
     "--minify",
-    "--sourcemap",
     "--outfile",
     "./release/vbl-pro.exe",
   ]);

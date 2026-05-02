@@ -1,52 +1,32 @@
 import type { Key, KeyboardEvent, NativeInputEvent } from "../types";
 import { UIOHOOK_TO_KEY, enrichKeyboardEvent } from "../utils";
-import { ensureStarted } from "../hook";
+import { ensureStarted, registerNativeHandler } from "../hook";
+import { FilteredListeners, ListenerList } from "../listeners";
 
 type AllKeyCallback = (event: KeyboardEvent) => void;
 type FilteredKeyCallback = (event: KeyboardEvent) => void;
 
-const downAll: AllKeyCallback[] = [];
-const upAll: AllKeyCallback[] = [];
-const downFiltered = new Map<string, FilteredKeyCallback[]>();
-const upFiltered = new Map<string, FilteredKeyCallback[]>();
+const downAll = new ListenerList<KeyboardEvent>();
+const upAll = new ListenerList<KeyboardEvent>();
+const downFiltered = new FilteredListeners<string, KeyboardEvent>();
+const upFiltered = new FilteredListeners<string, KeyboardEvent>();
 
 const heldKeys = new Set<number>();
-
-function removeFrom<T>(arr: T[], item: T) {
-  const i = arr.indexOf(item);
-  if (i !== -1) arr.splice(i, 1);
-}
-
-function emit<T>(listeners: readonly ((event: T) => void)[], event: T) {
-  for (const listener of [...listeners]) listener(event);
-}
-
-let hooked = false;
-function ensureHooked() {
-  if (hooked) return;
-  hooked = true;
-}
 
 export function handleNativeKeyboardEvent(e: NativeInputEvent) {
   if (e.type === "keydown") {
     const event = enrichKeyboardEvent(e, heldKeys);
     heldKeys.add(event.keycode);
-    emit(downAll, event);
+    downAll.emit(event);
     const key = UIOHOOK_TO_KEY[event.keycode];
-    if (key) {
-      const cbs = downFiltered.get(key);
-      if (cbs) emit(cbs, event);
-    }
+    if (key) downFiltered.emit(key, event);
   } else if (e.type === "keyup") {
     const keycode = e.keycode ?? 0;
     heldKeys.delete(keycode);
     const event = enrichKeyboardEvent(e, heldKeys);
-    emit(upAll, event);
+    upAll.emit(event);
     const key = UIOHOOK_TO_KEY[event.keycode];
-    if (key) {
-      const cbs = upFiltered.get(key);
-      if (cbs) emit(cbs, event);
-    }
+    if (key) upFiltered.emit(key, event);
   }
 }
 
@@ -60,23 +40,20 @@ export function on(
   cb?: FilteredKeyCallback,
 ): () => void {
   ensureStarted();
-  ensureHooked();
 
   if (typeof keyOrCb === "function") {
-    const list = event === "down" ? downAll : upAll;
-    list.push(keyOrCb);
-    return () => removeFrom(list, keyOrCb);
+    return (event === "down" ? downAll : upAll).add(keyOrCb);
   }
 
   const key = String(keyOrCb);
-  const map = event === "down" ? downFiltered : upFiltered;
-  if (!map.has(key)) map.set(key, []);
-  map.get(key)!.push(cb!);
-  return () => {
-    const arr = map.get(key);
-    if (arr) removeFrom(arr, cb!);
-  };
+  return (event === "down" ? downFiltered : upFiltered).add(key, cb!);
 }
+
+const onKey = on as (
+  event: "down" | "up",
+  keyOrCb: Key | AllKeyCallback,
+  cb?: FilteredKeyCallback,
+) => () => void;
 
 export function once(event: "down", callback: AllKeyCallback): () => void;
 export function once(event: "down", key: Key, callback: FilteredKeyCallback): () => void;
@@ -88,13 +65,15 @@ export function once(
   cb?: FilteredKeyCallback,
 ): () => void {
   if (typeof keyOrCb === "function") {
-    const wrapper: AllKeyCallback = (e) => { off(); keyOrCb(e); };
-    const off = on(event as "down", wrapper);
-    return off;
+    let unsub: () => void;
+    const wrapper: AllKeyCallback = (e) => { unsub(); keyOrCb(e); };
+    unsub = onKey(event, wrapper);
+    return unsub;
   }
-  const wrapper: FilteredKeyCallback = (e) => { off(); cb!(e); };
-  const off = on(event as "down", keyOrCb as Key, wrapper);
-  return off;
+  let unsub: () => void;
+  const wrapper: FilteredKeyCallback = (e) => { unsub(); cb!(e); };
+  unsub = onKey(event, keyOrCb as Key, wrapper);
+  return unsub;
 }
 
 export function off(event: "down"): void;
@@ -103,11 +82,9 @@ export function off(event: "up"): void;
 export function off(event: "up", key: Key): void;
 export function off(event: "down" | "up", key?: Key): void {
   if (key === undefined) {
-    const list = event === "down" ? downAll : upAll;
-    list.length = 0;
+    (event === "down" ? downAll : upAll).clear();
   } else {
-    const map = event === "down" ? downFiltered : upFiltered;
-    map.delete(String(key));
+    (event === "down" ? downFiltered : upFiltered).clear(String(key));
   }
 }
 
@@ -142,3 +119,5 @@ export function waitUp(key: Key, timeout?: number): Promise<KeyboardEvent> {
     }
   });
 }
+
+registerNativeHandler(handleNativeKeyboardEvent);

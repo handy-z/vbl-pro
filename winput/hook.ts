@@ -1,10 +1,12 @@
 import type { NativeInputEvent } from "./types";
-import { handleNativeKeyboardEvent } from "./keyboard/listener";
-import { handleNativeMouseEvent } from "./mouse/listener";
-
-const nativeInput = require("../native/input/input.node");
+import { nativeInput } from "./native";
 
 let isStarted = false;
+const handlers: ((event: NativeInputEvent) => void)[] = [];
+
+export function registerNativeHandler(handler: (event: NativeInputEvent) => void) {
+  handlers.push(handler);
+}
 
 export function startHook() {
   if (isStarted) return;
@@ -15,8 +17,7 @@ export function startHook() {
       return;
     }
     const event = JSON.parse(json) as NativeInputEvent;
-    handleNativeKeyboardEvent(event);
-    handleNativeMouseEvent(event);
+    for (const handler of handlers) handler(event);
   });
 }
 

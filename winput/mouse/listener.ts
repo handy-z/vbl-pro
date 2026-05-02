@@ -1,50 +1,34 @@
-import { ensureStarted } from "../hook";
+import { ensureStarted, registerNativeHandler } from "../hook";
 import type { MouseBtn, MouseEvent, MouseMoveEvent, MouseWheelEvent, NativeInputEvent } from "../types";
 import { enrichMouseEvent, enrichWheelEvent } from "../utils";
+import { FilteredListeners, ListenerList } from "../listeners";
 
 type AllBtnCallback = (event: MouseEvent) => void;
 type FilteredBtnCallback = (event: MouseEvent) => void;
 type MoveCallback = (event: MouseMoveEvent) => void;
 type WheelCallback = (event: MouseWheelEvent) => void;
 
-const downAll: AllBtnCallback[] = [];
-const upAll: AllBtnCallback[] = [];
-const downFiltered = new Map<MouseBtn, FilteredBtnCallback[]>();
-const upFiltered = new Map<MouseBtn, FilteredBtnCallback[]>();
-const moveListeners: MoveCallback[] = [];
-const wheelListeners: WheelCallback[] = [];
-
-function removeFrom<T>(arr: T[], item: T) {
-  const i = arr.indexOf(item);
-  if (i !== -1) arr.splice(i, 1);
-}
-
-function emit<T>(listeners: readonly ((event: T) => void)[], event: T) {
-  for (const listener of [...listeners]) listener(event);
-}
-
-let hooked = false;
-function ensureHooked() {
-  if (hooked) return;
-  hooked = true;
-}
+const downAll = new ListenerList<MouseEvent>();
+const upAll = new ListenerList<MouseEvent>();
+const downFiltered = new FilteredListeners<MouseBtn, MouseEvent>();
+const upFiltered = new FilteredListeners<MouseBtn, MouseEvent>();
+const moveListeners = new ListenerList<MouseMoveEvent>();
+const wheelListeners = new ListenerList<MouseWheelEvent>();
 
 export function handleNativeMouseEvent(e: NativeInputEvent) {
   if (e.type === "mousedown") {
     const event = enrichMouseEvent(e);
-    emit(downAll, event);
-    const cbs = downFiltered.get(event.btn);
-    if (cbs) emit(cbs, event);
+    downAll.emit(event);
+    downFiltered.emit(event.btn, event);
   } else if (e.type === "mouseup") {
     const event = enrichMouseEvent(e);
-    emit(upAll, event);
-    const cbs = upFiltered.get(event.btn);
-    if (cbs) emit(cbs, event);
+    upAll.emit(event);
+    upFiltered.emit(event.btn, event);
   } else if (e.type === "mousemove") {
-    emit(moveListeners, { ...e, x: e.x ?? 0, y: e.y ?? 0 });
+    moveListeners.emit({ ...e, x: e.x ?? 0, y: e.y ?? 0 });
   } else if (e.type === "wheel") {
     const event = enrichWheelEvent(e);
-    emit(wheelListeners, event);
+    wheelListeners.emit(event);
   }
 }
 
@@ -60,35 +44,24 @@ export function on(
   cb?: FilteredBtnCallback,
 ): () => void {
   ensureStarted();
-  ensureHooked();
 
   if (event === "move") {
     const callback = btnOrCb as MoveCallback;
-    moveListeners.push(callback);
-    return () => removeFrom(moveListeners, callback);
+    return moveListeners.add(callback);
   }
 
   if (event === "wheel") {
     const callback = btnOrCb as WheelCallback;
-    wheelListeners.push(callback);
-    return () => removeFrom(wheelListeners, callback);
+    return wheelListeners.add(callback);
   }
 
   if (typeof btnOrCb === "function") {
-    const list = event === "down" ? downAll : upAll;
     const callback = btnOrCb as AllBtnCallback;
-    list.push(callback);
-    return () => removeFrom(list, callback);
+    return (event === "down" ? downAll : upAll).add(callback);
   }
 
   const button = btnOrCb as MouseBtn;
-  const map = event === "down" ? downFiltered : upFiltered;
-  if (!map.has(button)) map.set(button, []);
-  map.get(button)!.push(cb!);
-  return () => {
-    const arr = map.get(button);
-    if (arr) removeFrom(arr, cb!);
-  };
+  return (event === "down" ? downFiltered : upFiltered).add(button, cb!);
 }
 
 export function once(event: "down", callback: AllBtnCallback): () => void;
@@ -104,25 +77,29 @@ export function once(
 ): () => void {
   if (event === "move") {
     const orig = btnOrCb as MoveCallback;
+    let unsub: () => void;
     const wrapper: MoveCallback = (e) => { unsub(); orig(e); };
-    const unsub = on("move", wrapper);
+    unsub = on("move", wrapper);
     return unsub;
   }
   if (event === "wheel") {
     const orig = btnOrCb as WheelCallback;
+    let unsub: () => void;
     const wrapper: WheelCallback = (e) => { unsub(); orig(e); };
-    const unsub = on("wheel", wrapper);
+    unsub = on("wheel", wrapper);
     return unsub;
   }
   if (typeof btnOrCb === "function") {
     const orig = btnOrCb as AllBtnCallback;
+    let unsub: () => void;
     const wrapper: AllBtnCallback = (e) => { unsub(); orig(e); };
-    const unsub = on(event as "down", wrapper);
+    unsub = on(event as "down", wrapper);
     return unsub;
   }
   const orig = cb!;
+  let unsub: () => void;
   const wrapper: FilteredBtnCallback = (e) => { unsub(); orig(e); };
-  const unsub = on(event as "down", btnOrCb as MouseBtn, wrapper);
+  unsub = on(event as "down", btnOrCb as MouseBtn, wrapper);
   return unsub;
 }
 
@@ -133,14 +110,12 @@ export function off(event: "up", button: MouseBtn): void;
 export function off(event: "move"): void;
 export function off(event: "wheel"): void;
 export function off(event: "down" | "up" | "move" | "wheel", button?: MouseBtn): void {
-  if (event === "move") { moveListeners.length = 0; return; }
-  if (event === "wheel") { wheelListeners.length = 0; return; }
+  if (event === "move") { moveListeners.clear(); return; }
+  if (event === "wheel") { wheelListeners.clear(); return; }
   if (button === undefined) {
-    const list = event === "down" ? downAll : upAll;
-    list.length = 0;
+    (event === "down" ? downAll : upAll).clear();
   } else {
-    const map = event === "down" ? downFiltered : upFiltered;
-    map.delete(button);
+    (event === "down" ? downFiltered : upFiltered).clear(button);
   }
 }
 
@@ -167,3 +142,5 @@ export function waitClick(button?: MouseBtn, timeout?: number): Promise<MouseEve
     }
   });
 }
+
+registerNativeHandler(handleNativeMouseEvent);

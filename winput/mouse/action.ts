@@ -1,52 +1,42 @@
 import { sleep } from "../utils";
 import type { MouseBtn, Position } from "../types";
+import { nativeInput } from "../native";
+import { Chain } from "../chain";
 
-const nativeInput = require("../../native/input/input.node");
-
-export class MouseChain implements PromiseLike<void> {
-  private promise: Promise<void>;
+export class MouseChain extends Chain<MouseChain> {
   private lastButton: MouseBtn;
 
   constructor(initial: Promise<void>, button: MouseBtn = "left") {
-    this.promise = initial;
+    super(initial);
     this.lastButton = button;
-  }
-
-  wait(ms: number): MouseChain {
-    this.promise = this.promise.then(() => sleep(ms));
-    return this;
   }
 
   down(button?: MouseBtn): MouseChain {
     const b = button ?? this.lastButton;
     this.lastButton = b;
-    this.promise = this.promise.then(() => nativeInput.mouseDown(b));
-    return this;
+    return this.append(() => nativeInput.mouseDown(b));
   }
 
   up(button?: MouseBtn): MouseChain {
     const b = button ?? this.lastButton;
-    this.promise = this.promise.then(() => nativeInput.mouseUp(b));
-    return this;
+    return this.append(() => nativeInput.mouseUp(b));
   }
 
   click(button?: MouseBtn, delay?: number): MouseChain {
     const b = button ?? this.lastButton;
-    this.promise = this.promise.then(() => nativeInput.mouseClick(b, delay));
-    return this;
+    return this.append(() => nativeInput.mouseClick(b, delay));
   }
 
   doubleClick(button?: MouseBtn, delay?: number): MouseChain {
     const b = button ?? this.lastButton;
-    this.promise = this.promise.then(async () => {
+    return this.append(async () => {
       nativeInput.mouseClick(b, delay);
       nativeInput.mouseClick(b, delay);
     });
-    return this;
   }
 
   move(x: number, y: number, duration?: number, smooth?: boolean): MouseChain {
-    this.promise = this.promise.then(async () => {
+    return this.append(async () => {
       if (smooth && duration) {
         await smoothMoveTo(x, y, duration);
       } else if (duration) {
@@ -55,15 +45,13 @@ export class MouseChain implements PromiseLike<void> {
         nativeInput.mouseMoveTo(x, y);
       }
     });
-    return this;
   }
 
   moveBy(dx: number, dy: number, delay?: number): MouseChain {
-    this.promise = this.promise.then(async () => {
+    return this.append(async () => {
       nativeInput.mouseMoveBy(dx, dy);
       if (delay) await sleep(delay);
     });
-    return this;
   }
 
   hold(button: MouseBtn | undefined, durationMs: number): MouseChain {
@@ -72,35 +60,25 @@ export class MouseChain implements PromiseLike<void> {
   }
 
   wheel(amount: number, delay?: number): MouseChain {
-    this.promise = this.promise.then(async () => {
+    return this.append(async () => {
       nativeInput.mouseWheel(amount);
       if (delay) await sleep(delay);
     });
-    return this;
   }
 
   drag(fromX: number, fromY: number, toX: number, toY: number, button?: MouseBtn): MouseChain {
     const b = button ?? this.lastButton;
-    this.promise = this.promise.then(async () => {
+    return this.append(async () => {
       nativeInput.mouseMoveTo(fromX, fromY);
       nativeInput.mouseDown(b);
       await sleep(35);
       await smoothMoveTo(toX, toY, 200);
       nativeInput.mouseUp(b);
     });
-    return this;
   }
 
   setPosition(pos: Position): MouseChain {
-    this.promise = this.promise.then(() => nativeInput.mouseMoveTo(pos.x, pos.y));
-    return this;
-  }
-
-  then<T = void, R = never>(
-    onfulfilled?: ((value: void) => T | PromiseLike<T>) | null,
-    onrejected?: ((reason: unknown) => R | PromiseLike<R>) | null,
-  ): Promise<T | R> {
-    return this.promise.then(onfulfilled, onrejected);
+    return this.append(() => nativeInput.mouseMoveTo(pos.x, pos.y));
   }
 }
 
