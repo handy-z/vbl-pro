@@ -1,6 +1,6 @@
 declare var self: Worker;
 
-import { GameState } from "state";
+import { GameState } from "../state";
 
 let state: GameState;
 let actionResolve: (() => void) | null = null;

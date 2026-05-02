@@ -12,14 +12,6 @@
     "allowImportingTsExtensions": true,
     "verbatimModuleSyntax": true,
     "noEmit": true,
-    "paths": {
-      "winput": ["./winput"],
-      "state": ["./src/state"],
-      "assets/*": ["./assets/*"],
-      "native/*": ["./native/*"],
-      "config.json": ["./config.json"],
-      "game_watcher.json": ["./game_watcher.json"]
-    },
 
     "strict": true,
     "skipLibCheck": true,

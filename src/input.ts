@@ -1,6 +1,6 @@
-import { keyboard, mouse } from "winput";
-import { gameState } from "state";
-import config from "config.json";
+import { keyboard, mouse } from "../winput";
+import { gameState } from "./state";
+import config from "../config.json";
 
 export function bindMouseEvents() {
   mouse.on("down", "x1", async () => {

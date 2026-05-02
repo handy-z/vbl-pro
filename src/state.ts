@@ -1,4 +1,4 @@
-import watcherConfig from "game_watcher.json";
+import watcherConfig from "../game_watcher.json";
 
 const STATE_KEYS = {
   GameOnGround: 0,

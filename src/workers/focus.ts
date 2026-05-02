@@ -1,7 +1,7 @@
 declare var self: Worker;
 
 import { dlopen, FFIType, ptr } from "bun:ffi";
-import { GameState } from "state";
+import { GameState } from "../state";
 
 const PROCESS_QUERY_LIMITED_INFORMATION = 0x1000;
 const TARGET = "RobloxPlayerBeta.exe";

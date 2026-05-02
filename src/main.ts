@@ -3,7 +3,7 @@ import { initPixelWorker, initLoopx2Worker, initFocusWorker } from "./workers";
 import { startCrosshairOverlay, stopCrosshairOverlay } from "./overlay";
 import { bindMouseEvents } from "./input";
 import { join } from "node:path";
-import winput from "winput";
+import winput from "../winput";
 
 const lockPath = join(Bun.env.TEMP ?? Bun.env.TMP ?? ".", "vbl-pro.lock");
 

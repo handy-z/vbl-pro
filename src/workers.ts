@@ -1,6 +1,6 @@
-import { gameState, watcherConfig } from "state";
-import { keyboard } from "winput";
-import config from "config.json";
+import { gameState, watcherConfig } from "./state";
+import { keyboard } from "../winput";
+import config from "../config.json";
 
 function createWorker(name: string) {
   return import.meta.url.endsWith(".js")

@@ -1,5 +1,5 @@
-import crosshairPath from "assets/crosshair.png" with { type: "file" };
-import config from "config.json";
+import crosshairPath from "../assets/crosshair.png" with { type: "file" };
+import config from "../config.json";
 
 type OverlayNative = {
   startOverlay(image: Uint8Array, cfg: typeof config.crosshair, targetProcessName?: string): void;
@@ -7,7 +7,7 @@ type OverlayNative = {
   isOverlayRunning(): boolean;
 };
 
-const native = require("native/overlay/overlay.node") as OverlayNative;
+const native = require("../native/overlay/overlay.node") as OverlayNative;
 const targetProcessName = "RobloxPlayerBeta.exe";
 
 export async function startCrosshairOverlay() {

@@ -1,7 +1,7 @@
 declare var self: Worker;
 
 import { dlopen, FFIType } from "bun:ffi";
-import { GameState, type StateKey } from "state";
+import { GameState, type StateKey } from "../state";
 
 const user32 = dlopen("user32.dll", {
   GetDC: { args: [FFIType.ptr], returns: FFIType.ptr },
@@ -153,6 +153,6 @@ async function loop(state: GameState, resolutions: PreparedResolutionMap) {
       }
     }
 
-    await Bun.sleep(16);
+    await Bun.sleep(10);
   }
 }
