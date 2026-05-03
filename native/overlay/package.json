@@ -1,8 +1,0 @@
-{
-  "name": "overlay",
-  "version": "0.1.0",
-  "private": true,
-  "napi": {
-    "binaryName": "overlay"
-  }
-}

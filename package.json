@@ -1,27 +1,28 @@
 {
   "name": "vbl-pro",
-  "module": "src/main.ts",
   "type": "module",
   "private": true,
   "scripts": {
-    "start": "bun run src/main.ts",
-    "dev": "bun run --watch src/main.ts",
-    "check": "bun run scripts/build.ts check",
-
-    "build:native": "bun run scripts/build.ts native",
-
-    "clean:build": "bun -e \"require('node:fs').rmSync('./build',{recursive:true,force:true})\"",
-    "clean:release": "bun -e \"require('node:fs').rmSync('./release',{recursive:true,force:true})\"",
-
-    "build": "bun run scripts/build.ts build",
-    "compile": "bun run scripts/build.ts compile"
+    "dev": "vite --host 127.0.0.1",
+    "build": "vite build",
+    "check": "tsc --noEmit && cargo check --manifest-path src-tauri/Cargo.toml",
+    "tauri": "tauri",
+    "desktop:dev": "tauri dev",
+    "desktop:build": "tauri build"
   },
   "devDependencies": {
-    "@napi-rs/cli": "latest",
-    "@types/bun": "latest"
+    "@tauri-apps/cli": "2.11.0",
+    "@types/react": "19.2.14",
+    "@types/react-dom": "19.2.3",
+    "@vitejs/plugin-react": "6.0.1",
+    "typescript": "6.0.3",
+    "vite": "8.0.10"
   },
-  "peerDependencies": {
-    "typescript": "latest"
-  },
-  "dependencies": {}
+  "dependencies": {
+    "@tauri-apps/api": "2.11.0",
+    "@tauri-apps/plugin-dialog": "^2.7.1",
+    "react": "19.2.5",
+    "react-colorful": "^5.6.1",
+    "react-dom": "19.2.5"
+  }
 }

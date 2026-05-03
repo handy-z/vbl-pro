@@ -1,16 +1,13 @@
 {
   "compilerOptions": {
-    "lib": ["ESNext"],
-    "target": "ESNext",
-    "module": "Preserve",
-    "moduleDetection": "force",
-    "allowJs": true,
+    "lib": ["DOM", "DOM.Iterable", "ESNext"],
+    "target": "ES2020",
+    "module": "ESNext",
+    "jsx": "react-jsx",
     "resolveJsonModule": true,
-    "types": ["bun"],
-
+    "types": ["vite/client"],
     "moduleResolution": "bundler",
-    "allowImportingTsExtensions": true,
-    "verbatimModuleSyntax": true,
+    "isolatedModules": true,
     "noEmit": true,
 
     "strict": true,
@@ -22,5 +19,7 @@
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "noPropertyAccessFromIndexSignature": false
-  }
+  },
+  "include": ["src/**/*.ts", "src/**/*.tsx", "vite.config.ts"],
+  "exclude": ["winput", "native", "scripts", "src-tauri", "build", "release"]
 }

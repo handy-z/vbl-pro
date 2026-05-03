@@ -4,6 +4,7 @@ dist
 build
 release
 target
+src-tauri/gen
 *.tgz
 coverage
 *.lcov
@@ -23,3 +24,4 @@ report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 .DS_Store
 *.exe
 *.lock
+!src-tauri/Cargo.lock
