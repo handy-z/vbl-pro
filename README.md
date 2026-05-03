@@ -40,6 +40,12 @@ Built with [Tauri](https://tauri.app/), React, and native Rust to ensure zero la
    
    Ensure the game window is actively focused. The macro will automatically adapt its timings and keypresses depending on if the pixel scanner detects that you are on the ground or if your skill is ready.
 
+### ⚠️ Important: Resolution Requirements
+Because the macro relies on a precise **Pixel Scanner** to read the game state (like checking if you are on the ground or if your skill is ready), your Roblox window must match a supported resolution.
+- By default, the application comes pre-configured for **1920x1080** and **1600x900** monitors. 
+- It is highly recommended to play in **Fullscreen** at one of these resolutions so the pixel coordinates align perfectly.
+- If you use a different resolution, you *must* manually calibrate the X/Y coordinates and colors in the **Config -> Pixel Watcher** tab to match your specific screen setup.
+
 ---
 
 ## 💻 Technology Stack
