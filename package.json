@@ -7,10 +7,12 @@
     "build": "vite build",
     "check": "tsc --noEmit && cargo check --manifest-path src-tauri/Cargo.toml",
     "tauri": "tauri",
+    "release": " bun scripts/release.ts",
     "desktop:dev": "tauri dev",
-    "desktop:build": "tauri build"
+    "desktop:build": "tauri build && bun run release"
   },
   "devDependencies": {
+    "@types/node": "22.10.5",
     "@tauri-apps/cli": "2.11.0",
     "@types/react": "19.2.14",
     "@types/react-dom": "19.2.3",
