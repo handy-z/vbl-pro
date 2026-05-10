@@ -9,9 +9,10 @@
     "commit": "bun scripts/commit.ts",
     "tauri": "tauri",
     "release": "bun scripts/release.ts",
+    "release:github": "bun scripts/release.ts --upload",
     "desktop:dev": "tauri dev",
     "desktop:build": "tauri build && bun run release",
-    "desktop:release": "tauri build && bun scripts/release.ts --upload"
+    "desktop:release": "tauri build && bun run release:github"
   },
   "devDependencies": {
     "@tauri-apps/cli": "2.11.0",

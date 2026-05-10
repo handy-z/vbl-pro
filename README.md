@@ -139,6 +139,7 @@ Most settings can be edited from the **Config** tab without manually editing JSO
 | `bun run dev` | Starts the Vite dev server on `127.0.0.1`. |
 | `bun run build` | Builds the React frontend into `dist/`. |
 | `bun run check` | Runs TypeScript type checking and `cargo check` for the Tauri backend. |
+| `bun run commit` | Stages and commits pending changes with a generated or custom message. |
 | `bun run tauri` | Runs the local Tauri CLI. |
 | `bun run desktop:dev` | Starts the full Tauri desktop app in development mode. |
 | `bun run desktop:build` | Builds the Tauri app and collects release artifacts. |
@@ -198,7 +199,7 @@ Release upload behavior:
 - Uses `GITHUB_TOKEN` or `GH_TOKEN` for release upload permissions.
 - Creates or reuses a draft GitHub release for the tag.
 - Replaces existing release assets with the same file names.
-- Commits and pushes pending git changes before uploading when `--upload` is used.
+- Commits pending git changes, then pushes the current branch before uploading when `--upload` is used.
 
 Optional environment variables:
 

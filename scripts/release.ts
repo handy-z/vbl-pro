@@ -219,20 +219,19 @@ function defaultReleaseCommitMessage(uploadContext: UploadContext): string {
 }
 
 function commitAndPushChanges(uploadContext: UploadContext): void {
-  if (!hasGitChanges()) {
+  if (hasGitChanges()) {
+    const commitMessage =
+      process.env["RELEASE_COMMIT_MESSAGE"] ??
+      defaultReleaseCommitMessage(uploadContext);
+
+    console.log(`Committing git changes with message: ${commitMessage}`);
+    runGit(["add", "-A"]);
+    runGit(["commit", "-m", commitMessage]);
+  } else {
     console.log("No git changes to commit before release");
-    return;
   }
 
-  const commitMessage =
-    process.env["RELEASE_COMMIT_MESSAGE"] ??
-    defaultReleaseCommitMessage(uploadContext);
-
-  console.log(`Committing git changes with message: ${commitMessage}`);
-  runGit(["add", "-A"]);
-  runGit(["commit", "-m", commitMessage]);
-
-  console.log(`Pushing release commit to origin/${uploadContext.branch}`);
+  console.log(`Pushing release HEAD to origin/${uploadContext.branch}`);
   runGit(["push", "origin", `HEAD:${uploadContext.branch}`]);
 }
 
