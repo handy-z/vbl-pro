@@ -6,12 +6,12 @@
     "dev": "vite --host 127.0.0.1",
     "build": "vite build",
     "check": "tsc --noEmit && cargo check --manifest-path src-tauri/Cargo.toml",
+    "commit": "bun scripts/commit.ts",
     "tauri": "tauri",
     "release": "bun scripts/release.ts",
-    "release:github": "bun scripts/release.ts --upload",
     "desktop:dev": "tauri dev",
     "desktop:build": "tauri build && bun run release",
-    "desktop:release": "tauri build && bun run release:github"
+    "desktop:release": "tauri build && bun scripts/release.ts --upload"
   },
   "devDependencies": {
     "@tauri-apps/cli": "2.11.0",
