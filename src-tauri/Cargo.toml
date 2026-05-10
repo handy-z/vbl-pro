@@ -31,8 +31,8 @@ windows-sys = { version = "0.61.2", features = [
 
 [profile.release]
 opt-level = "z"
-lto = true
-codegen-units = 1
+lto = "thin"
+codegen-units = 16
 panic = "abort"
 debug = 0
 strip = true

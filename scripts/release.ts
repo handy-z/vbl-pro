@@ -13,6 +13,7 @@ const targetReleaseDir = path.join(
 );
 const nsisDir = path.join(targetReleaseDir, "bundle", "nsis");
 const upload = process.argv.includes("--upload");
+const exeOnly = process.argv.includes("--exe-only");
 const githubApi = "https://api.github.com";
 
 type GithubRelease = {
@@ -100,7 +101,9 @@ function collectArtifacts(): string[] {
   }
 
   copyExecutables(targetReleaseDir);
-  copyExecutables(nsisDir);
+  if (!exeOnly) {
+    copyExecutables(nsisDir);
+  }
 
   const artifacts = fs
     .readdirSync(releaseDir, { withFileTypes: true })
