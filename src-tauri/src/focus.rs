@@ -6,14 +6,14 @@ use std::ptr::null_mut;
 use std::sync::atomic::Ordering;
 use std::sync::Mutex;
 use std::thread;
+use std::time::Duration;
 use tauri::AppHandle;
 use windows_sys::Win32::Foundation::HWND;
 use windows_sys::Win32::System::Threading::GetCurrentThreadId;
 use windows_sys::Win32::UI::Accessibility::{SetWinEventHook, UnhookWinEvent, HWINEVENTHOOK};
 use windows_sys::Win32::UI::WindowsAndMessaging::{
-    DispatchMessageW, GetMessageW, PeekMessageW, PostThreadMessageW, TranslateMessage,
-    EVENT_SYSTEM_FOREGROUND, MSG, PM_NOREMOVE, WINEVENT_OUTOFCONTEXT, WINEVENT_SKIPOWNPROCESS,
-    WM_QUIT,
+    DispatchMessageW, PeekMessageW, PostThreadMessageW, TranslateMessage, EVENT_SYSTEM_FOREGROUND,
+    MSG, PM_NOREMOVE, PM_REMOVE, WINEVENT_OUTOFCONTEXT, WINEVENT_SKIPOWNPROCESS, WM_QUIT,
 };
 
 struct FocusContext {
@@ -25,6 +25,7 @@ struct FocusContext {
 unsafe impl Send for FocusContext {}
 
 static CONTEXT: Lazy<Mutex<Option<FocusContext>>> = Lazy::new(|| Mutex::new(None));
+const FOCUS_POLL_INTERVAL_MS: u64 = 200;
 
 pub fn start(state: AppState, app: AppHandle) {
     if state
@@ -94,14 +95,21 @@ pub fn start(state: AppState, app: AppHandle) {
 
             update_focus(foreground_root_window());
 
-            while thread_state
+            'monitor: while thread_state
                 .runtime()
                 .runtime_enabled
                 .load(Ordering::SeqCst)
-                && GetMessageW(&mut message, null_mut(), 0, 0) > 0
             {
-                TranslateMessage(&message);
-                DispatchMessageW(&message);
+                while PeekMessageW(&mut message, null_mut(), 0, 0, PM_REMOVE) != 0 {
+                    if message.message == WM_QUIT {
+                        break 'monitor;
+                    }
+                    TranslateMessage(&message);
+                    DispatchMessageW(&message);
+                }
+
+                update_focus(foreground_root_window());
+                thread::sleep(Duration::from_millis(FOCUS_POLL_INTERVAL_MS));
             }
 
             UnhookWinEvent(hook);

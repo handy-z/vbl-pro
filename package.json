@@ -7,13 +7,15 @@
     "build": "vite build",
     "check": "tsc --noEmit && cargo check --manifest-path src-tauri/Cargo.toml",
     "tauri": "tauri",
-    "release": " bun scripts/release.ts",
+    "release": "bun scripts/release.ts",
+    "release:github": "bun scripts/release.ts --upload",
     "desktop:dev": "tauri dev",
-    "desktop:build": "tauri build && bun run release"
+    "desktop:build": "tauri build && bun run release",
+    "desktop:release": "tauri build && bun run release:github"
   },
   "devDependencies": {
-    "@types/node": "22.10.5",
     "@tauri-apps/cli": "2.11.0",
+    "@types/node": "^22.10.5",
     "@types/react": "19.2.14",
     "@types/react-dom": "19.2.3",
     "@vitejs/plugin-react": "6.0.1",
