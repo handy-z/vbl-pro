@@ -13,7 +13,7 @@
     "desktop:dev": "tauri dev",
     "desktop:build": "tauri build --bundles nsis && bun run release",
     "desktop:build:exe": "tauri build --no-bundle && bun scripts/release.ts --exe-only",
-    "desktop:release": "tauri build --bundles nsis && bun run release:github"
+    "desktop:release": "bun scripts/release.ts --build --upload"
   },
   "devDependencies": {
     "@tauri-apps/cli": "2.11.0",

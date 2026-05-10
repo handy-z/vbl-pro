@@ -5,6 +5,7 @@ import { execFileSync } from "node:child_process";
 
 const releaseDir = path.join(process.cwd(), "release");
 const tauriConfigPath = path.join(process.cwd(), "src-tauri", "tauri.conf.json");
+const cargoManifestPath = path.join(process.cwd(), "src-tauri", "Cargo.toml");
 const targetReleaseDir = path.join(
   process.cwd(),
   "src-tauri",
@@ -12,9 +13,16 @@ const targetReleaseDir = path.join(
   "release",
 );
 const nsisDir = path.join(targetReleaseDir, "bundle", "nsis");
-const upload = process.argv.includes("--upload");
-const exeOnly = process.argv.includes("--exe-only");
 const githubApi = "https://api.github.com";
+
+type ReleaseOptions = {
+  build: boolean;
+  bumpVersion: boolean;
+  exeOnly: boolean;
+  manualVersion: string | null;
+  noVersionBump: boolean;
+  upload: boolean;
+};
 
 type GithubRelease = {
   id: number;
@@ -30,9 +38,11 @@ type GithubAsset = {
   name: string;
 };
 
-type TauriConfig = {
+type TauriConfig = Record<string, unknown> & {
   version?: string;
 };
+
+type UploadPrerequisites = Omit<UploadContext, "tag">;
 
 type UploadContext = {
   token: string;
@@ -51,6 +61,109 @@ class ReleaseError extends Error {
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
+}
+
+function parseOptions(args: string[]): ReleaseOptions {
+  const options: ReleaseOptions = {
+    build: false,
+    bumpVersion: false,
+    exeOnly: false,
+    manualVersion: null,
+    noVersionBump: false,
+    upload: false,
+  };
+
+  for (let index = 0; index < args.length; index += 1) {
+    const arg = args[index];
+    if (!arg || arg === "--") {
+      continue;
+    }
+
+    if (arg === "--help" || arg === "-h") {
+      printHelp();
+      process.exit(0);
+    }
+
+    if (arg === "--build") {
+      options.build = true;
+      continue;
+    }
+
+    if (arg === "--bump-version") {
+      options.bumpVersion = true;
+      continue;
+    }
+
+    if (arg === "--exe-only") {
+      options.exeOnly = true;
+      continue;
+    }
+
+    if (arg === "--no-version-bump") {
+      options.noVersionBump = true;
+      continue;
+    }
+
+    if (arg === "--upload") {
+      options.upload = true;
+      continue;
+    }
+
+    if (arg === "--version") {
+      const version = args[index + 1];
+      if (!version) {
+        throw new ReleaseError("--version requires a value like 1.2.3.");
+      }
+
+      options.manualVersion = version;
+      index += 1;
+      continue;
+    }
+
+    if (arg.startsWith("--version=")) {
+      options.manualVersion = arg.slice("--version=".length);
+      continue;
+    }
+
+    throw new ReleaseError(`Unknown release option: ${arg}`);
+  }
+
+  if (options.manualVersion && options.bumpVersion) {
+    throw new ReleaseError("Use either --version or --bump-version, not both.");
+  }
+
+  if (options.manualVersion && options.noVersionBump) {
+    throw new ReleaseError("Use either --version or --no-version-bump, not both.");
+  }
+
+  if (options.bumpVersion && options.noVersionBump) {
+    throw new ReleaseError(
+      "Use either --bump-version or --no-version-bump, not both.",
+    );
+  }
+
+  return options;
+}
+
+function printHelp(): void {
+  console.log(`Usage:
+  bun scripts/release.ts
+  bun scripts/release.ts --upload
+  bun scripts/release.ts --build --upload
+  bun scripts/release.ts --build --upload --version 1.2.3
+
+Options:
+  --build                 Build the Tauri app before collecting artifacts.
+  --upload                Upload collected artifacts to a draft GitHub release.
+  --version <x.y.z>       Set the release version before building.
+  --bump-version          Increment the patch version before building.
+  --no-version-bump       Skip the automatic patch bump for --build --upload.
+  --exe-only              Collect only the unpackaged executable.
+  -h, --help              Show this help text.
+
+Environment:
+  RELEASE_VERSION         Default exact version when --version is not passed.
+  GITHUB_TOKEN / GH_TOKEN GitHub token with release write permission.`);
 }
 
 function copyExecutables(dir: string): string[] {
@@ -93,7 +206,7 @@ function clean(): void {
   }
 }
 
-function collectArtifacts(): string[] {
+function collectArtifacts(options: ReleaseOptions): string[] {
   clean();
 
   if (!fs.existsSync(releaseDir)) {
@@ -101,7 +214,7 @@ function collectArtifacts(): string[] {
   }
 
   copyExecutables(targetReleaseDir);
-  if (!exeOnly) {
+  if (!options.exeOnly) {
     copyExecutables(nsisDir);
   }
 
@@ -119,20 +232,154 @@ function collectArtifacts(): string[] {
   return artifacts;
 }
 
-function readReleaseTag(): string {
+function readTauriConfig(): TauriConfig {
   if (!fs.existsSync(tauriConfigPath)) {
     throw new ReleaseError(`Missing Tauri config at ${tauriConfigPath}`);
   }
 
-  const config = JSON.parse(
-    fs.readFileSync(tauriConfigPath, "utf8"),
-  ) as TauriConfig;
+  return JSON.parse(fs.readFileSync(tauriConfigPath, "utf8")) as TauriConfig;
+}
+
+function readReleaseVersion(): string {
+  const config = readTauriConfig();
 
   if (!config.version) {
     throw new ReleaseError("Missing `version` in src-tauri/tauri.conf.json");
   }
 
-  return `v${config.version}`;
+  return normalizeVersion(config.version);
+}
+
+function readReleaseTag(): string {
+  return `v${readReleaseVersion()}`;
+}
+
+function normalizeVersion(version: string): string {
+  const normalized = version.trim().replace(/^v/i, "");
+  if (!/^\d+\.\d+\.\d+$/.test(normalized)) {
+    throw new ReleaseError(
+      `Invalid version "${version}". Expected x.y.z, for example 1.2.3.`,
+    );
+  }
+
+  return normalized;
+}
+
+function bumpPatchVersion(version: string): string {
+  const [majorText, minorText, patchText] = normalizeVersion(version).split(
+    ".",
+  ) as [string, string, string];
+  const major = Number.parseInt(majorText, 10);
+  const minor = Number.parseInt(minorText, 10);
+  const patch = Number.parseInt(patchText, 10);
+
+  return `${major}.${minor}.${patch + 1}`;
+}
+
+function requestedReleaseVersion(options: ReleaseOptions): string | null {
+  const envVersion = process.env["RELEASE_VERSION"]?.trim();
+  if (options.manualVersion !== null) {
+    return normalizeVersion(options.manualVersion);
+  }
+
+  if (envVersion) {
+    return normalizeVersion(envVersion);
+  }
+
+  if (options.bumpVersion) {
+    return bumpPatchVersion(readReleaseVersion());
+  }
+
+  if (options.build && options.upload && !options.noVersionBump) {
+    return bumpPatchVersion(readReleaseVersion());
+  }
+
+  return null;
+}
+
+function writeTauriConfigVersion(version: string): void {
+  const config = readTauriConfig();
+  config.version = version;
+  fs.writeFileSync(tauriConfigPath, `${JSON.stringify(config, null, 2)}\n`);
+}
+
+function writeCargoManifestVersion(version: string): void {
+  if (!fs.existsSync(cargoManifestPath)) {
+    throw new ReleaseError(`Missing Cargo manifest at ${cargoManifestPath}`);
+  }
+
+  const content = fs.readFileSync(cargoManifestPath, "utf8");
+  const packageStart = content.indexOf("[package]");
+  if (packageStart < 0) {
+    throw new ReleaseError("Missing [package] section in src-tauri/Cargo.toml");
+  }
+
+  const nextSection = content.indexOf("\n[", packageStart + 1);
+  const packageEnd = nextSection < 0 ? content.length : nextSection;
+  const beforePackage = content.slice(0, packageStart);
+  const packageSection = content.slice(packageStart, packageEnd);
+  const afterPackage = content.slice(packageEnd);
+
+  if (!/^version\s*=\s*"[^"]+"/m.test(packageSection)) {
+    throw new ReleaseError(
+      "Missing package version in src-tauri/Cargo.toml [package] section",
+    );
+  }
+
+  const updatedPackageSection = packageSection.replace(
+    /^version\s*=\s*"[^"]+"/m,
+    `version = "${version}"`,
+  );
+
+  fs.writeFileSync(
+    cargoManifestPath,
+    `${beforePackage}${updatedPackageSection}${afterPackage}`,
+  );
+}
+
+function prepareReleaseVersion(options: ReleaseOptions): void {
+  const version = requestedReleaseVersion(options);
+  if (!version) {
+    return;
+  }
+
+  if (!options.build) {
+    throw new ReleaseError(
+      "Version changes must run before a build. Use `bun run desktop:release -- --version x.y.z`.",
+    );
+  }
+
+  const currentVersion = readReleaseVersion();
+  if (version === currentVersion) {
+    console.log(`Release version already ${version}`);
+  } else {
+    console.log(`Updating release version ${currentVersion} -> ${version}`);
+    writeTauriConfigVersion(version);
+  }
+
+  writeCargoManifestVersion(version);
+}
+
+function runCommand(command: string, args: string[]): void {
+  try {
+    execFileSync(command, args, { stdio: "inherit" });
+  } catch (error) {
+    throw new ReleaseError(
+      `Command failed: ${command} ${args.join(" ")}. ${errorMessage(error)}`,
+    );
+  }
+}
+
+function buildTauri(options: ReleaseOptions): void {
+  if (!options.build) {
+    return;
+  }
+
+  const buildArgs = options.exeOnly
+    ? ["run", "tauri", "build", "--no-bundle"]
+    : ["run", "tauri", "build", "--bundles", "nsis"];
+
+  runCommand(process.execPath, buildArgs);
 }
 
 function readGit(args: string[]): string {
@@ -430,15 +677,23 @@ async function uploadAsset(
   console.log(`Uploaded release/${fileName}`);
 }
 
-function resolveUploadContext(): UploadContext {
+function resolveUploadPrerequisites(): UploadPrerequisites {
   const repo = resolveGithubRepo();
 
   return {
     token: resolveGithubToken(),
     repo,
-    tag: readReleaseTag(),
     branch: currentBranch(),
     username: resolveReleaseUsername(repo),
+  };
+}
+
+function resolveUploadContext(
+  prerequisites: UploadPrerequisites,
+): UploadContext {
+  return {
+    ...prerequisites,
+    tag: readReleaseTag(),
   };
 }
 
@@ -463,10 +718,16 @@ async function uploadArtifacts(
 }
 
 async function main(): Promise<void> {
-  const uploadContext = upload ? resolveUploadContext() : null;
-  const artifacts = collectArtifacts();
+  const options = parseOptions(process.argv.slice(2));
+  const uploadPrerequisites = options.upload ? resolveUploadPrerequisites() : null;
 
-  if (uploadContext) {
+  prepareReleaseVersion(options);
+  buildTauri(options);
+
+  const artifacts = collectArtifacts(options);
+
+  if (uploadPrerequisites) {
+    const uploadContext = resolveUploadContext(uploadPrerequisites);
     commitAndPushChanges(uploadContext);
     await uploadArtifacts(uploadContext, artifacts);
   }

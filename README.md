@@ -145,7 +145,7 @@ Most settings can be edited from the **Config** tab without manually editing JSO
 | `bun run desktop:build` | Builds the Tauri app and collects release artifacts. |
 | `bun run release` | Copies built executable artifacts into `release/`. |
 | `bun run release:github` | Uploads collected artifacts to a draft GitHub release. |
-| `bun run desktop:release` | Builds, collects artifacts, commits release changes if needed, pushes, and uploads to GitHub. |
+| `bun run desktop:release` | Bumps the patch version, builds, collects artifacts, commits release changes, pushes, and uploads to GitHub. |
 
 ## Project Structure
 
@@ -192,9 +192,19 @@ $env:GITHUB_TOKEN = "your-token"
 bun run desktop:release
 ```
 
+By default, `desktop:release` increments the patch version before building, for example `0.1.0` becomes `0.1.1`.
+
+Set an exact release version manually:
+
+```powershell
+$env:GITHUB_TOKEN = "your-token"
+bun run desktop:release -- --version 0.2.0
+```
+
 Release upload behavior:
 
-- Reads the release tag from `src-tauri/tauri.conf.json`, for example `0.1.0` becomes `v0.1.0`.
+- Updates `src-tauri/tauri.conf.json` and `src-tauri/Cargo.toml` before building.
+- Reads the release tag from `src-tauri/tauri.conf.json`, for example `0.1.1` becomes `v0.1.1`.
 - Resolves the GitHub repository from `GITHUB_REPOSITORY` or `origin`.
 - Uses `GITHUB_TOKEN` or `GH_TOKEN` for release upload permissions.
 - Creates or reuses a draft GitHub release for the tag.
@@ -207,6 +217,7 @@ Optional environment variables:
 | --- | --- |
 | `GITHUB_REPOSITORY` | Explicit `owner/repo` target if `origin` cannot be parsed. |
 | `GITHUB_TOKEN` / `GH_TOKEN` | GitHub token with release write permission. |
+| `RELEASE_VERSION` | Exact `x.y.z` version to use when `--version` is not passed. |
 | `RELEASE_USERNAME` | Username used for the generated release commit message. |
 | `RELEASE_COMMIT_MESSAGE` | Custom commit message for release changes. |
 
